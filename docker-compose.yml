@@ -1,0 +1,44 @@
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-laotour}
+      MARIADB_USER: ${DB_USER:-laotour}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-laotour_secret}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - '3306:3306'
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./apps/api
+    environment:
+      DATABASE_URL: mysql://${DB_USER:-laotour}:${DB_PASSWORD:-laotour_secret}@db:3306/${DB_NAME:-laotour}
+      JWT_SECRET: ${JWT_SECRET:-change-me-before-production}
+      PORT: 3001
+    ports:
+      - '3001:3001'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE:-http://localhost:3001/api}
+    ports:
+      - '3000:3000'
+    depends_on:
+      - api
+
+volumes:
+  mariadb_data:
+
